@@ -1,0 +1,15 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+# Archivos de Visual Studio
+.vs/
+*.db
+*.db-shm
+*.db-wal
+slnx.sqlite
+
+# Node
+node_modules/
+npm-debug.log*
+

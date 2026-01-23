@@ -1,0 +1,22 @@
+{
+    "name": "spellingbeebackend",
+    "version": "1.0.0",
+    "description": "Backend para licencias y pagos de Spelling Bee Contest",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vercel dev"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/AleteoStudios/spelling-bee-contest-backend.git"
+    },
+    "bugs": {
+        "url": "https://github.com/AleteoStudios/spelling-bee-contest-backend/issues"
+    },
+    "homepage": "https://github.com/AleteoStudios/spelling-bee-contest-backend#readme",
+    "dependencies": {}
+}
