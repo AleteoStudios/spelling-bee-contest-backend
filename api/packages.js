@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Error consultando packages:', error);
-      return res.status(500).json({ ok: false, error: 'Error consultando paquetes' });
+      return res.status(500).json({ ok: false, error: error.message });
     }
 
     return res.status(200).json({
