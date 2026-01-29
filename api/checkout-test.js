@@ -1,6 +1,15 @@
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 export default async function handler(req, res) {
+     // --- CORS ---
+  res.setHeader('Access-Control-Allow-Origin', 'https://aleteostudios.github.io');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  // --- fin CORS ---
     try {
         if (req.method !== 'GET') {
             return res.status(405).json({ ok: false, error: 'Method not allowed' });
