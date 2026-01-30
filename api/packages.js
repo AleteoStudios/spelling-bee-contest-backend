@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 export default async function handler(req, res) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
      // --- CORS ---
   res.setHeader('Access-Control-Allow-Origin', 'https://aleteostudios.github.io');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
