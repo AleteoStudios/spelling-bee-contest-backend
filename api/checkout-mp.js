@@ -1,72 +1,126 @@
-import MercadoPago from "mercadopago";
+﻿// api/checkout-mp.js
+import { MercadoPagoConfig, Preference } from "mercadopago";
+import { createClient } from "@supabase/supabase-js";
 
+// === Supabase ======================================================
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.warn("⚠️ Falta SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY/ANON_KEY");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// === Mercado Pago ==================================================
+// Usa tu Access Token de producción o de prueba
+const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+
+if (!mpAccessToken) {
+    console.warn("⚠️ Falta MP_ACCESS_TOKEN en las variables de entorno");
+}
+
+// Cliente de Mercado Pago (SDK nuevo)
+const mpClient = new MercadoPagoConfig({
+    accessToken: mpAccessToken,
+});
+
+const preference = new Preference(mpClient);
+
+// ===================================================================
+// Serverless function para Vercel
 export default async function handler(req, res) {
     try {
+        if (req.method !== "GET") {
+            res.status(405).json({ ok: false, error: "Method not allowed" });
+            return;
+        }
+
         const { package_id, email } = req.query;
 
         if (!package_id || !email) {
-            return res.status(400).json({
-                ok: false,
-                error: "package_id y email son requeridos"
-            });
+            res
+                .status(400)
+                .json({ ok: false, error: "Faltan parámetros package_id o email" });
+            return;
         }
 
-        // Configurar Mercado Pago (SDK nuevo)
-        const mp = new MercadoPago({
-            accessToken: process.env.MP_ACCESS_TOKEN
-        });
+        // 1) Buscar el paquete en Supabase
+        const { data: pkg, error: pkgError } = await supabase
+            .from("packages")
+            .select("*")
+            .eq("id", package_id)
+            .maybeSingle();
 
-        // Paquetes (puedes luego moverlos a BD)
-        const PACKAGES = {
-            PAQ1: { title: "Licencia Mensual B�sica", price: 250 },
-            PAQ2: { title: "Licencia Institucional Anual", price: 1550 },
-            PAQ3: { title: "Licencia Perpetua Personalizada", price: 3500 }
-        };
-
-        const selected = PACKAGES[package_id];
-
-        if (!selected) {
-            return res.status(404).json({
-                ok: false,
-                error: "Paquete no encontrado"
-            });
+        if (pkgError) {
+            console.error("Error Supabase:", pkgError);
+            res.status(500).json({ ok: false, error: "Error leyendo paquetes" });
+            return;
         }
 
-        // Crear preferencia de pago
-        const preference = await mp.preferences.create({
-            items: [
-                {
-                    title: selected.title,
-                    quantity: 1,
-                    unit_price: selected.price,
-                    currency_id: "MXN"
-                }
-            ],
-            payer: {
-                email
+        if (!pkg) {
+            res.status(404).json({ ok: false, error: "Paquete no encontrado" });
+            return;
+        }
+
+        // 2) Crear la preferencia en Mercado Pago (SDK nuevo)
+        const prefResult = await preference.create({
+            body: {
+                items: [
+                    {
+                        id: pkg.id,
+                        title: pkg.name,
+                        quantity: 1,
+                        currency_id: "MXN",
+                        unit_price: pkg.price_mxn,
+                    },
+                ],
+                payer: {
+                    email,
+                },
+                metadata: {
+                    package_id: pkg.id,
+                    contact_email: email,
+                },
+                back_urls: {
+                    success:
+                        "https://aleteostudios.github.io/spelling-bee-contest-landing/gracias.html",
+                    failure:
+                        "https://aleteostudios.github.io/spelling-bee-contest-landing/error.html",
+                    pending:
+                        "https://aleteostudios.github.io/spelling-bee-contest-landing/pending.html",
+                },
+                auto_return: "approved",
+                // (opcional) URL para webhooks/notificaciones:
+                // notification_url: "https://spelling-bee-contest-backend.vercel.app/api/mp-webhook",
             },
-            metadata: {
-                package_id
-            },
-            back_urls: {
-                success: "https://aletostudios.github.io/spelling-bee-contest-landing/success.html",
-                failure: "https://aletostudios.github.io/spelling-bee-contest-landing/failure.html",
-                pending: "https://aletostudios.github.io/spelling-bee-contest-landing/pending.html"
-            },
-            auto_return: "approved"
         });
 
-        return res.status(200).json({
+        // La forma exacta de la respuesta puede variar; tomamos el init_point
+        const pref =
+            prefResult && typeof prefResult === "object" ? prefResult : {};
+        const initPoint =
+            pref.init_point ??
+            pref.sandbox_init_point ??
+            pref.body?.init_point ??
+            pref.body?.sandbox_init_point ??
+            null;
+
+        res.status(200).json({
             ok: true,
-            init_point: preference.init_point,
-            sandbox_init_point: preference.sandbox_init_point
+            package: {
+                id: pkg.id,
+                name: pkg.name,
+                price_mxn: pkg.price_mxn,
+            },
+            preference: pref,
+            init_point: initPoint,
         });
-
-    } catch (error) {
-        console.error("Mercado Pago error:", error);
-        return res.status(500).json({
-            ok: false,
-            error: error.message
-        });
+    } catch (err) {
+        console.error("Error en /api/checkout-mp:", err);
+        res
+            .status(500)
+            .json({ ok: false, error: err.message ?? "Error interno del servidor" });
     }
 }
