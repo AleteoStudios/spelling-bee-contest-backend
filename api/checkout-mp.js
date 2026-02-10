@@ -1,10 +1,4 @@
-// api/checkout-mp.js
-import mercadopago from "mercadopago";
-
-// Configura Mercado Pago con tu ACCESS TOKEN
-mercadopago.configure({
-    access_token: process.env.MP_ACCESS_TOKEN,
-});
+import MercadoPago from "mercadopago";
 
 export default async function handler(req, res) {
     try {
@@ -13,74 +7,66 @@ export default async function handler(req, res) {
         if (!package_id || !email) {
             return res.status(400).json({
                 ok: false,
-                error: "Faltan parámetros: package_id o email",
+                error: "package_id y email son requeridos"
             });
         }
 
-        // Paquetes (puedes luego moverlos a DB)
-        const packages = {
-            PAQ1: {
-                title: "Licencia Mensual Básica – Spelling Bee Contest",
-                price: 250,
-            },
-            PAQ2: {
-                title: "Licencia Institucional Anual – Spelling Bee Contest",
-                price: 1550,
-            },
-            PAQ3: {
-                title: "Licencia Perpetua Personalizada – Spelling Bee Contest",
-                price: 3500,
-            },
+        // Configurar Mercado Pago (SDK nuevo)
+        const mp = new MercadoPago({
+            accessToken: process.env.MP_ACCESS_TOKEN
+        });
+
+        // Paquetes (puedes luego moverlos a BD)
+        const PACKAGES = {
+            PAQ1: { title: "Licencia Mensual Básica", price: 250 },
+            PAQ2: { title: "Licencia Institucional Anual", price: 1550 },
+            PAQ3: { title: "Licencia Perpetua Personalizada", price: 3500 }
         };
 
-        const selectedPackage = packages[package_id];
+        const selected = PACKAGES[package_id];
 
-        if (!selectedPackage) {
+        if (!selected) {
             return res.status(404).json({
                 ok: false,
-                error: "Paquete no encontrado",
+                error: "Paquete no encontrado"
             });
         }
 
-        const preference = {
+        // Crear preferencia de pago
+        const preference = await mp.preferences.create({
             items: [
                 {
-                    title: selectedPackage.title,
+                    title: selected.title,
                     quantity: 1,
-                    currency_id: "MXN",
-                    unit_price: selectedPackage.price,
-                },
+                    unit_price: selected.price,
+                    currency_id: "MXN"
+                }
             ],
             payer: {
-                email,
+                email
+            },
+            metadata: {
+                package_id
             },
             back_urls: {
                 success: "https://aletostudios.github.io/spelling-bee-contest-landing/success.html",
-                failure: "https://aletostudios.github.io/spelling-bee-contest-landing/error.html",
-                pending: "https://aletostudios.github.io/spelling-bee-contest-landing/pending.html",
+                failure: "https://aletostudios.github.io/spelling-bee-contest-landing/failure.html",
+                pending: "https://aletostudios.github.io/spelling-bee-contest-landing/pending.html"
             },
-            auto_return: "approved",
-            metadata: {
-                package_id,
-                email,
-            },
-        };
-
-        const response = await mercadopago.preferences.create(preference);
+            auto_return: "approved"
+        });
 
         return res.status(200).json({
             ok: true,
-            init_point: response.body.init_point, // Producción
-            sandbox_init_point: response.body.sandbox_init_point, // Pruebas
+            init_point: preference.init_point,
+            sandbox_init_point: preference.sandbox_init_point
         });
 
     } catch (error) {
         console.error("Mercado Pago error:", error);
-
         return res.status(500).json({
             ok: false,
-            error: "Error creando preferencia de pago",
-            detail: error.message,
+            error: error.message
         });
     }
 }
