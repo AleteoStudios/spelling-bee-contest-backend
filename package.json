@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "Backend para licencias y pagos de Spelling Bee Contest",
     "private": true,
-    "type": "module",
+    "type": "commonjs",
     "scripts": {
         "dev": "vercel dev"
     },
