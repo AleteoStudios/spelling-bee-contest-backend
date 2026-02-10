@@ -1,77 +1,67 @@
-const mercadopago = require("mercadopago");
-const { createClient } = require("@supabase/supabase-js");
+// api/checkout-mp.js
+import mercadopago from "mercadopago";
 
+// Configura Mercado Pago con tu ACCESS TOKEN
 mercadopago.configure({
     access_token: process.env.MP_ACCESS_TOKEN,
 });
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-module.exports = async (req, res) => {
-    // CORS
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-    if (req.method === "OPTIONS") {
-        return res.status(200).end();
-    }
-
-    if (req.method !== "GET") {
-        return res.status(405).json({ ok: false, error: "Method not allowed" });
-    }
-
+export default async function handler(req, res) {
     try {
         const { package_id, email } = req.query;
 
         if (!package_id || !email) {
             return res.status(400).json({
                 ok: false,
-                error: "package_id y email son requeridos",
+                error: "Faltan parámetros: package_id o email",
             });
         }
 
-        // 1. Obtener paquete desde Supabase
-        const { data: pkg, error } = await supabase
-            .from("packages")
-            .select("*")
-            .eq("id", package_id)
-            .single();
+        // Paquetes (puedes luego moverlos a DB)
+        const packages = {
+            PAQ1: {
+                title: "Licencia Mensual Básica – Spelling Bee Contest",
+                price: 250,
+            },
+            PAQ2: {
+                title: "Licencia Institucional Anual – Spelling Bee Contest",
+                price: 1550,
+            },
+            PAQ3: {
+                title: "Licencia Perpetua Personalizada – Spelling Bee Contest",
+                price: 3500,
+            },
+        };
 
-        if (error || !pkg) {
+        const selectedPackage = packages[package_id];
+
+        if (!selectedPackage) {
             return res.status(404).json({
                 ok: false,
                 error: "Paquete no encontrado",
             });
         }
 
-        // 2. Crear preferencia en Mercado Pago
         const preference = {
             items: [
                 {
-                    title: `Spelling Bee Contest - ${pkg.name}`,
+                    title: selectedPackage.title,
                     quantity: 1,
                     currency_id: "MXN",
-                    unit_price: Number(pkg.price_mxn),
+                    unit_price: selectedPackage.price,
                 },
             ],
             payer: {
                 email,
             },
             back_urls: {
-                success:
-                    "https://aleteostudios.github.io/spelling-bee-contest-landing/?status=success",
-                failure:
-                    "https://aleteostudios.github.io/spelling-bee-contest-landing/?status=failure",
-                pending:
-                    "https://aleteostudios.github.io/spelling-bee-contest-landing/?status=pending",
+                success: "https://aletostudios.github.io/spelling-bee-contest-landing/success.html",
+                failure: "https://aletostudios.github.io/spelling-bee-contest-landing/error.html",
+                pending: "https://aletostudios.github.io/spelling-bee-contest-landing/pending.html",
             },
             auto_return: "approved",
             metadata: {
-                package_id: pkg.id,
+                package_id,
                 email,
             },
         };
@@ -80,14 +70,17 @@ module.exports = async (req, res) => {
 
         return res.status(200).json({
             ok: true,
-            init_point:
-                response.body.init_point || response.body.sandbox_init_point,
+            init_point: response.body.init_point, // Producción
+            sandbox_init_point: response.body.sandbox_init_point, // Pruebas
         });
-    } catch (err) {
-        console.error("checkout-mp error:", err);
+
+    } catch (error) {
+        console.error("Mercado Pago error:", error);
+
         return res.status(500).json({
             ok: false,
             error: "Error creando preferencia de pago",
+            detail: error.message,
         });
     }
-};
+}
