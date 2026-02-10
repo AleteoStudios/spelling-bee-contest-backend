@@ -19,6 +19,7 @@
     },
     "homepage": "https://github.com/AleteoStudios/spelling-bee-contest-backend#readme",
     "dependencies": {
-        "@supabase/supabase-js": "^2.91.0"
+        "@supabase/supabase-js": "^2.91.0",
+        "mercadopago": "^2.12.0"
     }
 }
